@@ -22,6 +22,10 @@ seaborn>=0.12
 scikit-learn>=1.4
 joblib>=1.3
 
+# Only for the SMOTE comparison in notebook 02. Check first:
+#   python -c "import imblearn"
+imbalanced-learn>=0.12
+
 # Notebooks. Already present if you installed Anaconda or JupyterLab.
 jupyterlab>=4.0
 ipykernel>=6.0
