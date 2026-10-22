@@ -131,17 +131,51 @@ def build_pipeline(model, **features):
     ])
 
 
-def build_smote_pipeline(model, **features):
-    """Like build_pipeline, but with SMOTE between preprocessing and model.
+def build_resampled_pipeline(model, sampler, **features):
+    """Like build_pipeline, but with a resampler between preprocessing and model.
 
-    The imbalanced-learn pipeline only oversamples during fit, so every
+    The imbalanced-learn pipeline only resamples during fit, so every
     validation fold keeps its real share of yes.
     """
-    from imblearn.over_sampling import SMOTE
     from imblearn.pipeline import Pipeline as ImbPipeline
 
     steps = build_pipeline(model, **features).steps
-    return ImbPipeline(steps[:2] + [("smote", SMOTE(random_state=RANDOM_STATE))] + steps[2:])
+    return ImbPipeline(steps[:2] + [("resample", sampler)] + steps[2:])
+
+
+def compare_imbalance(make_models, samplers, X, y, cv, **features):
+    """Every model with every way of handling the imbalance, on the same folds.
+
+    `make_models(class_weight)` returns {name: model}. In `samplers`, None means
+    no handling, "balanced" means class weights, anything else is an imblearn
+    resampler. Each combination is scored at 0.5 and at its own best threshold,
+    because the handling mostly moves the threshold where a model does best.
+    """
+    import numpy as np
+    import pandas as pd
+    from sklearn.base import clone
+    from sklearn.metrics import f1_score
+    from sklearn.model_selection import cross_val_predict
+
+    thresholds = np.round(np.arange(0.05, 0.96, 0.05), 2)
+    rows = []
+    for method, sampler in samplers.items():
+        weight = "balanced" if sampler == "balanced" else None
+        for name, model in make_models(weight).items():
+            if sampler is None or sampler == "balanced":
+                pipe = build_pipeline(model, **features)
+            else:
+                pipe = build_resampled_pipeline(model, clone(sampler), **features)
+            proba = cross_val_predict(pipe, X, y, cv=cv, method="predict_proba")[:, 1]
+            table = threshold_table(y, proba, thresholds)
+            best = table["F1"].idxmax()
+            fold_f1 = [f1_score(y.iloc[val], proba[val] >= best) for _, val in cv.split(X, y)]
+            rows.append({"model": name, "imbalance": method,
+                         "F1 at 0.5": table.loc[0.5, "F1"],
+                         "best F1": table.loc[best, "F1"], "F1 std": np.std(fold_f1),
+                         "at threshold": best,
+                         "recall": table.loc[best, "recall"], "precision": table.loc[best, "precision"]})
+    return pd.DataFrame(rows).round(3)
 
 
 def make_cv():

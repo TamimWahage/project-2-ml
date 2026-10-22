@@ -53,17 +53,19 @@ What I cleaned (see [notebook 01](notebooks/01_eda_and_baseline.ipynb)):
 
 ## Models compared
 
-All on the same 5 stratified folds of the training set (80%), each with and without `class_weight="balanced"`. Best version of each family:
+All four model families on the same 5 stratified folds of the training set (80%), each with six ways of handling the imbalance: none, class weights, random oversampling, SMOTE, random undersampling and cluster centroids (undersampling by k-means clustering). Each combination is scored at its own best threshold, because the handling mostly just moves that threshold. Best version of each family:
 
-| Model | F1 (mean ± spread) |
-|---|---|
-| **Gradient boosting, balanced** | **0.476 ± 0.010** |
-| Logistic regression, balanced | 0.451 ± 0.009 |
-| Random forest | 0.376 ± 0.003 |
-| Decision tree | 0.335 ± 0.011 |
-| Baseline: call everyone | 0.203 |
+| Model | Imbalance handling | F1 (mean ± spread) |
+|---|---|---|
+| **Gradient boosting** | **class weights** | **0.499 ± 0.014** |
+| Logistic regression | random oversampling | 0.485 ± 0.012 |
+| Random forest | random undersampling | 0.466 ± 0.014 |
+| Decision tree | SMOTE | 0.338 ± 0.014 |
+| Baseline: call everyone | | 0.203 |
 
-Tuning (grid search for logistic regression, random search for gradient boosting) didn't beat the default settings. Class weights, SMOTE and no handling at all end up at the same F1 once the threshold is moved, so the threshold is what really matters. It was chosen from cross-validated probabilities: 0.60 is the lowest threshold within the fold spread of the best F1, because a missed yes costs more than a wasted call. Details are in [notebook 02](notebooks/02_pipelines_and_models.ipynb).
+The model family matters, the imbalance method hardly does: for gradient boosting and logistic regression every method except cluster centroids ends up within the fold spread. Cluster centroids drops gradient boosting to baseline level. I kept class weights: just as good, and no clients copied, made up or thrown away. Gradient boosting beats logistic regression on every one of the 5 folds.
+
+Tuning (grid search for logistic regression, random search for gradient boosting) didn't beat the default settings. The threshold was chosen from cross-validated probabilities: 0.60 is the lowest threshold within the fold spread of the best F1, because a missed yes costs more than a wasted call. Details are in [notebook 02](notebooks/02_pipelines_and_models.ipynb).
 
 ## How to run
 
@@ -73,7 +75,7 @@ cd project-2-ml
 
 # check the libraries first, a current Anaconda install has them
 python -c "import pandas, numpy, matplotlib, seaborn, sklearn, joblib; print('all present')"
-python -c "import imblearn"          # only needed for the SMOTE comparison in notebook 02
+python -c "import imblearn"          # only needed for the imbalance comparison in notebook 02
 
 python download_data.py bank         # downloads the data into data/raw/
 
